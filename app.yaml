@@ -13,13 +13,13 @@ handlers:
 
   
 - url: /static/image
-  static_dir: static/image
+  static_dir: ReactClient/static/image
 - url: /static/js
-  static_dir: static/js
+  static_dir: ReactClient/static/js
 - url: /static/css
-  static_dir: static/css
+  static_dir: ReactClient/static/css
 - url: /static/media
-  static_dir: static/media
+  static_dir: ReactClient/static/media
 
 - url: /scripts
   static_dir: scripts

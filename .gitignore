@@ -1,2 +1,8 @@
 *.pyc
 static/*
+ReactClient/static/index.html
+ReactClient/static/css/*.chunk.css
+ReactClient/static/css/*.css.map
+ReactClient/static/js/*.chunk.js.LICENSE
+ReactClient/static/js/*.js
+ReactClient/static/js/*.js.map

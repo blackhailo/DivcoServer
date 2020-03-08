@@ -11,15 +11,14 @@ import os
 import json
 
 
-import DivcoDataStore
+import DataStore.DivcoDataStore
 
 
 # import authInterface
 # import tileLog
 import time
 
-sys.path.insert(1, './helpers')
-import divCoUtil
+import Helpers.DivCoUtil as DivCoUtil
 
 from google.appengine.ext import ndb
 
@@ -550,7 +549,7 @@ class BaseHandler(webapp2.RequestHandler):
 
 class GetReactClientHandler(BaseHandler):
     def get(self, arg1=None, arg2=None):
-        template = self.webtemplate("static\index.html")
+        template = self.webtemplate("ReactClient\static\index.html")
         
         self.response.write(template)
         # gqlString = "SELECT * FROM TPStore_v2"
@@ -626,8 +625,8 @@ class UpdateDataHandler(BaseHandler):
 class GetDataHandler(BaseHandler):
     def get(self):
         try:
-            projectID = divCoUtil.cleanupParams(self.request.GET, "projectID", int, True)
-            tileID = divCoUtil.cleanupParams(self.request.GET, "tileID", int, True)
+            projectID = DivCoUtil.cleanupParams(self.request.GET, "projectID", int, True)
+            tileID = DivCoUtil.cleanupParams(self.request.GET, "tileID", int, True)
         
         
             divCoTileParentPath = []

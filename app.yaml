@@ -1,37 +1,13 @@
-application: kurohailo
-version: 1
-runtime: python27
-api_version: 1
-threadsafe: yes
+runtime: python37
 
 handlers:
-- url: /css
-  static_dir: css
-- url: /favicon\.ico
-  static_files: favicon.ico
-  upload: favicon\.ico
+  # This configures Google App Engine to serve the files in the app's static
+  # directory.
+- url: /static
+  static_dir: static
 
-  
-- url: /static/image
-  static_dir: ReactClient/static/image
-- url: /static/js
-  static_dir: ReactClient/static/js
-- url: /static/css
-  static_dir: ReactClient/static/css
-- url: /static/media
-  static_dir: ReactClient/static/media
-
-- url: /scripts
-  static_dir: scripts
-- url: /images
-  static_dir: images
-
-- url: .*
-  script: main.app
-
-libraries:
-- name: webapp2
-  version: "2.5.2"
-
-- name: jinja2
-  version: "latest"
+  # This handler routes all requests not caught above to your main app. It is
+  # required when static routes are defined, but can be omitted (along with
+  # the entire handlers section) when there are no static files defined.
+- url: /.*
+  script: auto

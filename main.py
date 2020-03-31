@@ -1,7 +1,32 @@
-import flask
+import os
 import codecs
 import json
+import datetime
+
+import flask
 import werkzeug.exceptions
+
+from google.cloud import datastore
+DSC = datastore.Client()
+
+import DataStore.DivcoDataStore as DivcoDataStore
+
+def store_time(dt):
+    # with client.transaction():
+    entity = datastore.Entity(key=DSC.key('visit'))
+    entity.update({
+        'timestamp': dt
+    })
+
+    DSC.put(entity)
+
+def fetch_times(limit):
+    query = DSC.query(kind='visit')
+    query.order = ['-timestamp']
+
+    times = query.fetch(limit=limit)
+
+    return times
 
 def jsonResponse(responseDict):
     resp = flask.Response(json.dumps(responseDict, sort_keys=True), content_type="application/json")
@@ -21,15 +46,21 @@ app = flask.Flask(__name__)
 @app.route('/dashboard')
 @app.route('/tf/<int:pID>/<int:tID>')
 def reactClientHandler(pID = None, tID = None):
-    rawHtmlFile = codecs.open(r"static/index.html", encoding="utf-8")
-    rawHtml = rawHtmlFile.read()
-    rawHtmlFile.close()
+    # rawHtmlFile = codecs.open(r"static/index.html", encoding="utf-8")
+    # rawHtml = rawHtmlFile.read()
+    # rawHtmlFile.close()
 
-    resp = flask.Response(rawHtml)
+    store_time(datetime.datetime.now())
 
-    resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
-    resp.headers['Access-Control-Allow-Methods'] = 'POST,GET'
-    resp.headers['Access-Control-Request-Headers'] = 'Content-Type'
+    times = fetch_times(1000)
+
+    output = ""
+    stringTimes = map(lambda item: str(item['timestamp']), times)
+    
+    resp = flask.Response("<br />".join(stringTimes))
+    # resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    # resp.headers['Access-Control-Allow-Methods'] = 'POST,GET'
+    # resp.headers['Access-Control-Request-Headers'] = 'Content-Type'
 
     return resp
 
@@ -80,6 +111,77 @@ def getData():
     response["data"] = divCoTileData
 
     return jsonResponse(response)
+
+def getAllUserProject(userName):
+    activeQuery = DSC.query(kind='projectMeta')
+    activeQuery.add_filter('assoUserList', '=', userName)
+
+    userProjectList = activeQuery.fetch(limit=100)
+
+    return userProjectList
+
+# class ProjectHistory(ndb.Model):
+#     pid = ndb.IntegerProperty()
+#     ts = ndb.DateTimeProperty(auto_now=True)
+#     eventType = ndb.StringProperty()
+#     eventData = ndb.TextProperty()
+
+@app.route('/papi/hack')
+def hackspace():
+    # initDivco()
+    # nextPID = incProjectCounter()
+
+
+    pID = 3
+
+    doReset = True
+    if doReset: ## TEST FLOW
+        DivcoDataStore.clearProject(pID)
+
+        DivcoDataStore.createProjectMeta(pID)
+
+        entryType = "createTile"
+        rawEntryArgs = r'{"label":"tile_1","parentID":null}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "createTile"
+        rawEntryArgs = r'{"label":"tile_2","parentID":1}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "updateTile"
+        rawEntryArgs = r'{"tileID":1,"label":"TILE_1","status":3}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "deleteTile"
+        rawEntryArgs = r'{"tileID":2}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "createTile"
+        rawEntryArgs = r'{"label":"tile_3","parentID":1}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "createTile"
+        rawEntryArgs = r'{"label":"tile_4","parentID":1}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "createTile"
+        rawEntryArgs = r'{"label":"tile_5","parentID":1}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+        entryType = "reorderTile"
+        rawEntryArgs = r'{"tileID":5,"order":1}'
+        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+
+
+
+    
+    response = {}
+    
+    
+    # userProjectList = getAllUserProject("C")
+
+    return jsonResponse(response)
+
 
 if __name__ == '__main__':
     # This is used when running locally only. When deploying to Google App

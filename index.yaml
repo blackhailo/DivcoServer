@@ -1,0 +1,34 @@
+indexes:
+
+- kind: projectTileData
+  properties:
+  - name: parentID
+  - name: order
+    direction: desc
+
+- kind: projectTileData
+  properties:
+  - name: parentID
+  - name: order
+
+# - kind: LogEvent
+#   properties:
+#   - name: projectID
+#   - name: timeStamp
+
+# - kind: LogEvent
+#   properties:
+#   - name: projectID
+#   - name: timeStamp
+#     direction: desc
+
+# - kind: TPStore_v2
+#   properties:
+#   - name: PID
+#   - name: NID
+
+# - kind: TPStore_v2
+#   properties:
+#   - name: PID
+#   - name: NID
+#     direction: desc

@@ -1,12 +1,16 @@
+import datetime
 import time
 import json
+import hashlib
 
 from google.cloud import datastore
 DSC = datastore.Client()
 
+import Toolbox
+
 ### GLOBAL
 def initDivco():
-    pCounter = datastore.Entity(key=DSC.key('Counter', "pCounter"))
+    pCounter = datastore.Entity(key=DSC.key('counter', "pCounter"))
     pCounter.update({
         'count': 0
     })
@@ -16,7 +20,7 @@ def initDivco():
 def incProjectCounter():
     currentCount = None
     with DSC.transaction():
-        pCounter = DSC.get(DSC.key('Counter', "pCounter"))
+        pCounter = DSC.get(DSC.key('counter', "pCounter"))
         currentCount = pCounter["count"]
 
         pCounter.update({
@@ -44,11 +48,11 @@ def clearProject(projectID):
     projectMetaKey = DSC.key('projectMeta', projectID)
 
     tileDataQuery = DSC.query(kind='projectTileData')
-    tileDataQuery.add_filter('projectID', '=', 3)
+    tileDataQuery.add_filter('projectID', '=', projectID)
     tileDataQuery.keys_only()
 
     queryHistory = DSC.query(kind='projectHistory')
-    queryHistory.add_filter('projectID', '=', 3)
+    queryHistory.add_filter('projectID', '=', projectID)
     queryHistory.keys_only()
     
     batch = DSC.batch()
@@ -59,11 +63,11 @@ def clearProject(projectID):
         for item in queryHistory.fetch():
             batch.delete(item.key)
 
-def incTileCounter(projectID):
+def incTileCounter(pIDstring):
     currentCount = None
 
     with DSC.transaction():
-        projectMetaItem = DSC.get(DSC.key('projectMeta', projectID))
+        projectMetaItem = DSC.get(DSC.key('projectMeta', pIDstring))
         currentCount = projectMetaItem["tileCounter"]
 
         projectMetaItem.update({
@@ -83,7 +87,7 @@ def addToProjectHistory(pID, entryType, rawEntryArgs):
     
     if entryType == "createTile":
         if entryArgs.get("tileID") == None:
-            tileID = incTileCounter(pID)
+            tileID = incTileCounter(pIDstring)
             entryArgs["tileID"] = tileID
 
     projectHistoryItem.update({
@@ -94,13 +98,17 @@ def addToProjectHistory(pID, entryType, rawEntryArgs):
     })
 
     DSC.put(projectHistoryItem)
-    addToDivCoData(pID, entryType, entryArgs)
+
+    return addToDivCoData(pID, entryType, entryArgs)
 
 
 
 def addToDivCoData(pID, entryType, entryArgs):
+    returnMessage = {}
+
     if entryType == "createTile":
         tileID = entryArgs.get("tileID")
+
         projectTileData = datastore.Entity(key=DSC.key('projectTileData', str(pID) + "#" + str(tileID)))
 
         label = entryArgs.get("label")
@@ -109,7 +117,7 @@ def addToDivCoData(pID, entryType, entryArgs):
 
         parentPath = []
         if parentID != None:
-            parentTileData = DSC.get(DSC.key('projectTileData', str(pID) + "#" + str(parentID)))
+            parentTileData = getTileDataNode(pID, parentID)
             parentPath.extend(parentTileData["parentPath"])
 
             order = getlastTileOrder(parentID) + 1
@@ -133,47 +141,57 @@ def addToDivCoData(pID, entryType, entryArgs):
         })
 
         DSC.put(projectTileData)
+
+        returnMessage["status"] = True
+        returnMessage["tileChange"] = [projectTileData]
+
     elif entryType == "updateTile":
         tileID = entryArgs.get("tileID")
 
-        projectTileData = DSC.get(DSC.key('projectTileData', str(pID) + "#" + str(tileID)))
+        projectTileData = getTileDataNode(pID, tileID)
         
         updateDict = {}
-        newParentID = entryArgs.get("parentID", False)
-        if newParentID != False:
+        newParentID = entryArgs.get("parentID")
+        if newParentID != None:
             updateDict["parentID"] = newParentID
 
-        newLabel = entryArgs.get("label", False)
-        if newLabel != False:
+        newLabel = entryArgs.get("label")
+        if newLabel != None:
             updateDict["label"] = newLabel
 
-        newStatus = entryArgs.get("status", False)
-        if newStatus != False:
+        newStatus = entryArgs.get("status")
+        if newStatus != None:
             updateDict["status"] = newStatus
 
-        newAutoStatus = entryArgs.get("autoStatus", False)
-        if newAutoStatus != False:
+        newAutoStatus = entryArgs.get("autoStatus")
+        if newAutoStatus != None:
             updateDict["autoStatus"] = newAutoStatus
 
-        newOrder = entryArgs.get("order", False)
-        if newOrder != False:
+        newOrder = entryArgs.get("order")
+        if newOrder != None:
             updateDict["order"] = newOrder
 
         projectTileData.update(updateDict)
         DSC.put(projectTileData)
+
+        returnMessage["status"] = True
     elif entryType == "deleteTile":
         tileID = entryArgs.get("tileID")
 
         DSC.delete(DSC.key('projectTileData', str(pID) + "#" + str(tileID)))
+        returnMessage["status"] = True
     elif entryType == "reorderTile":
         tileID = entryArgs.get("tileID")
         order = entryArgs.get("order")
 
-        tileData = DSC.get(DSC.key('projectTileData', str(pID) + "#" + str(tileID)))
+        tileData = getTileDataNode(pID, tileID)
 
         if tileData:
             reorderTile(tileData["parentID"], tileID, order)
 
+        returnMessage["status"] = True
+    
+    return returnMessage
 
 def getlastTileOrder(parentID):
     queryTileData = DSC.query(kind='projectTileData')
@@ -215,6 +233,156 @@ def reorderTile(parentID, tileID, newOrder):
                 afterOrder = afterOrder + 1
 
 
+def getTileDataTree(projectID, TLTileID, stepLimit):
+    queryTileData = DSC.query(kind='projectTileData')
+    queryTileData.add_filter('projectID', '=', projectID)
+    queryTileData.add_filter('parentPath', '=', TLTileID)
+    queryTileData.add_filter('stepCounter', '<=', stepLimit)
+
+    itemList = queryTileData.fetch(1000)
+
+    dataList = []
+    for item in itemList:
+        dataItem = getTransFormat(item)
+
+        dataList.append(dataItem)
+
+    return dataList
+
+def getTileDataNode(projectID, tileID):
+    return DSC.get(DSC.key('projectTileData', str(projectID) + "#" + str(tileID)))
+
+def getTransFormat(tileDataItem):
+    dataItem = {}
+
+    dataItem["tileID"] = tileDataItem["tileID"]
+    dataItem["parentID"] = tileDataItem["parentID"]
+    dataItem["label"] = tileDataItem["label"]
+    dataItem["status"] = tileDataItem["status"]
+    dataItem["order"] = tileDataItem["order"]
+
+    return dataItem
+
+def getUserByCredentials(email, password):
+    queryUser = DSC.query(kind='user')
+    queryUser.add_filter('email', '=', email)
+    queryResult = queryUser.fetch(1)
+
+    promtedUserEntry = None
+    for item in queryResult:
+        promtedUserEntry = item
+    
+    if promtedUserEntry == None:
+        return None
+    
+    salt = promtedUserEntry["salt"]
+    saltedPass = promtedUserEntry["password"]
+
+    inputString = salt + password
+    sha256Generator = hashlib.sha256()
+    sha256Generator.update(inputString.encode('utf-8'))
+    submittedSaltedPass = sha256Generator.hexdigest()
+
+    if saltedPass == submittedSaltedPass:
+        return {"userID": promtedUserEntry.key.id, "userName" : promtedUserEntry["name"]}
+    else:
+        return None
+
+def createLoginSession(userID, authToken):
+    loginSessionEntry = datastore.Entity(key=DSC.key('loginSession', userID))
+
+    loginSessionEntry.update({
+        "userID": userID,
+        "created": datetime.datetime.now(),
+        "expiration": datetime.datetime.now() + datetime.timedelta(hours=2),
+
+        "authToken": authToken
+    })
+
+    DSC.put(loginSessionEntry)
+
+def getUserByLoginSession(authToken):
+    queryLoginSession = DSC.query(kind='loginSession')
+    queryLoginSession.add_filter('authToken', '=', authToken)
+    queryResult = queryLoginSession.fetch(1)
+
+    loginSesionItem = None
+    for item in queryResult:
+        loginSesionItem = item
+    
+    userID = loginSesionItem["userID"]  
+    userItem = DSC.get(DSC.key('user', userID))
+    
+    return userItem
+
+def refreshLoginSession(authToken, expiration):
+    queryLoginSession = DSC.query(kind='loginSession')
+    queryLoginSession.add_filter('authToken', '=', authToken)
+    queryResult = queryLoginSession.fetch(1)
+
+    loginSesionItem = None
+    for item in queryResult:
+        loginSesionItem = item
+    
+    if loginSesionItem:
+        loginSesionItem.update({
+            "expiration": expiration
+        })
+
+        DSC.put(loginSesionItem)
+
+def clearLoginSession(authToken):
+    if authToken:
+        queryLoginSession = DSC.query(kind='loginSession')
+        queryLoginSession.add_filter('authToken', '=', authToken)
+        queryLoginSession.keys_only()
+
+        queryResult = queryLoginSession.fetch(1)
+
+        for item in queryResult:
+            DSC.delete(item.key)
+
+
+def test():
+    email = "test@wathever.com"
+    name = "HailoTest"
+    password = "ged"
+
+    queryUser = DSC.query(kind='user')
+    queryUser.add_filter('email', '=', email)
+    queryResult = queryUser.fetch(1)
+    
+    createEntry = True
+    for item in queryResult:
+        createEntry = False
+
+    if createEntry:
+        userEntry = datastore.Entity(key=DSC.key('user'))
+
+        salt = Toolbox.createSalt()
+
+        inputString = salt + password
+        sha256Generator = hashlib.sha256()
+        sha256Generator.update(inputString.encode('utf-8'))
+        saltedPass = sha256Generator.hexdigest()
+
+
+        datetime.datetime.now()
+        userEntry.update({
+            "created": datetime.datetime.now(),
+            "updated": datetime.datetime.now(),
+
+            "email": email,
+            "name": name,
+            "salt": salt,
+            "password": saltedPass
+        })
+
+        DSC.put(userEntry)
+
+        print("test")
+    else:
+        print("skip")
 # class ProjectHistory(ndb.Model):
 #     pid = ndb.IntegerProperty()
 #     ts = ndb.DateTimeProperty(auto_now=True)
@@ -270,18 +438,6 @@ def reorderTile(parentID, tileID, newOrder):
 #         else:
 #             uniqueS = "%s_%s" % (self.projectID, tileID)
 #             return DivCoTileData.get_by_id(uniqueS)
-
-#     def addToProjectHistory(self, jsonString):
-#         projectHistoryItem = ProjectHistory()
-
-#         projectHistoryItem.pid = self.projectID
-#         projectHistoryItem.eventType = "createTile"
-#         projectHistoryItem.eventData = jsonString
-
-#         projectHistoryItem.put()
-
-#     def updateProjectState(self):
-#         pass
 
 #     # def createTile(self, parentID):
 #     #     tileID = allocTileID(self.projectID)

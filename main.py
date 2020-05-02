@@ -10,135 +10,119 @@ from google.cloud import datastore
 DSC = datastore.Client()
 
 import DataStore.DivcoDataStore as DivcoDataStore
+import DashboardAPI
+import UserAPI
 
-def store_time(dt):
-    # with client.transaction():
-    entity = datastore.Entity(key=DSC.key('visit'))
-    entity.update({
-        'timestamp': dt
-    })
+import AuthModule
 
-    DSC.put(entity)
-
-def fetch_times(limit):
-    query = DSC.query(kind='visit')
-    query.order = ['-timestamp']
-
-    times = query.fetch(limit=limit)
-
-    return times
-
-def jsonResponse(responseDict):
-    resp = flask.Response(json.dumps(responseDict, sort_keys=True), content_type="application/json")
-
-
-    resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
-    resp.headers['Access-Control-Allow-Methods'] = 'POST,GET'
-    resp.headers['Access-Control-Request-Headers'] = 'Content-Type'
-
-    resp.headers['Vary'] = 'Origin'
-    
-    return resp
+from Toolbox import jsonResponse
 
 app = flask.Flask(__name__)
+
+UserAPI.UserAPI(app)
+DashboardAPI.DashboardAPI(app)
 
 @app.route('/')
 @app.route('/dashboard')
 @app.route('/tf/<int:pID>/<int:tID>')
 def reactClientHandler(pID = None, tID = None):
-    # rawHtmlFile = codecs.open(r"static/index.html", encoding="utf-8")
-    # rawHtml = rawHtmlFile.read()
-    # rawHtmlFile.close()
+    print(flask.request.path)
 
-    store_time(datetime.datetime.now())
+    rawHtmlFile = codecs.open(r"static/index.html", encoding="utf-8")
+    rawHtml = rawHtmlFile.read()
+    rawHtmlFile.close()
 
-    times = fetch_times(1000)
+    response = flask.Response(rawHtml)
 
-    output = ""
-    stringTimes = map(lambda item: str(item['timestamp']), times)
-    
-    resp = flask.Response("<br />".join(stringTimes))
-    # resp.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
-    # resp.headers['Access-Control-Allow-Methods'] = 'POST,GET'
-    # resp.headers['Access-Control-Request-Headers'] = 'Content-Type'
-
-    return resp
+    return response
 
 @app.route('/papi/getTileData')
 def getData():
+    authToken = AuthModule.validateCookie()
+
     projectID = int(flask.request.args.get('projectID', ''))
     tileID = int(flask.request.args.get('tileID', ''))
 
-    divCoTileParentPath = []
-    divCoTileDataStump = [
-        ["1", None, "A", 3],
-        ["2", "1", "B", 1],
-        ["3", "1", "C", 0],
-        ["6", "2", "F", 3],
-        ["4", "3", "D", 2],
-        ["5", "3", "E", 0]
-    ]
+    divcoTileData = DivcoDataStore.getTileDataTree(projectID, tileID, 100)
 
-    tableStump = {
-        1 : {"id" : 1, "parent" : None, "pPath" : [1], "name" : "A", "status" : 3},
-        2 : {"id" : 2, "parent" : 1, "pPath" : [1,2], "name" : "B", "status" : 1},
-        3 : {"id" : 3, "parent" : 1, "pPath" : [1,3], "name" : "C", "status" : 0},
-        4 : {"id" : 4, "parent" : 3, "pPath" : [1,3,4], "name" : "D", "status" : 2},
-        5 : {"id" : 5, "parent" : 3, "pPath" : [1,3,5], "name" : "E", "status" : 0},
-        6 : {"id" : 6, "parent" : 2, "pPath" : [1,2,6], "name" : "F", "status" : 3}
-    }
-    
-    activeSet = set()
-    topLevelPath = None
-    divCoTileData = []
-    for tileDataItem in tableStump.values():
-        pPath = tileDataItem.pop("pPath")
+    currentNode = DivcoDataStore.getTileDataNode(projectID, tileID)
+    parentPath = currentNode["parentPath"]
 
-        if tileID in pPath:
-            divCoTileData.append(tileDataItem)
-            activeSet.add(tileID)
-
-            if tileDataItem["id"] == tileID:
-                topLevelPath = pPath
-
-    for cTID in topLevelPath:
-        if not cTID in activeSet:
-            divCoTileData.append(tableStump.get(cTID))
+    for pathTileID in parentPath:
+        if pathTileID != tileID:
+            pathNode = DivcoDataStore.getTileDataNode(projectID, pathTileID)
+            divcoTileData.append(DivcoDataStore.getTransFormat(pathNode))
 
     response = {}
-    response["parentPath"] = divCoTileParentPath
-    response["TLT"] = topLevelPath
-    response["data"] = divCoTileData
+    response["crumbPath"] = parentPath
+    response["data"] = divcoTileData
 
-    return jsonResponse(response)
+    return jsonResponse(response, authToken)
 
-def getAllUserProject(userName):
-    activeQuery = DSC.query(kind='projectMeta')
-    activeQuery.add_filter('assoUserList', '=', userName)
 
-    userProjectList = activeQuery.fetch(limit=100)
 
-    return userProjectList
+@app.route('/papi/updateTile', methods=['POST'])
+def updateTile():
+    authToken = AuthModule.validateCookie()
+    rawData = flask.request.form
+    
+    projectID = int(rawData.get("projectID"))
+    updateJsonString = rawData.get("tileData")
+    
+    entryType = "updateTile"
+    returnMessage = DivcoDataStore.addToProjectHistory(projectID, entryType, updateJsonString)
 
-# class ProjectHistory(ndb.Model):
-#     pid = ndb.IntegerProperty()
-#     ts = ndb.DateTimeProperty(auto_now=True)
-#     eventType = ndb.StringProperty()
-#     eventData = ndb.TextProperty()
+    response = {}
+    response["result"] = returnMessage["status"]
+
+    return jsonResponse(response, authToken)
+
+@app.route('/papi/createTile', methods=['POST'])
+def createTile():
+    authToken = AuthModule.validateCookie()
+    rawData = flask.request.form
+    
+    projectID = int(rawData.get("projectID"))
+    updateJsonString = rawData.get("tileData")
+    
+    entryType = "createTile"
+    returnMessage = DivcoDataStore.addToProjectHistory(projectID, entryType, updateJsonString)
+
+    transTileChange = map(lambda node: DivcoDataStore.getTransFormat(node), returnMessage["tileChange"])
+
+    response = {}
+    response["result"] = returnMessage["status"]
+    response["dataChange"] = list(transTileChange)
+
+    return jsonResponse(response, authToken)
+
+@app.route('/papi/deleteTile', methods=['POST'])
+def deleteTile():
+    authToken = AuthModule.validateCookie()
+    rawData = flask.request.form
+    
+    projectID = int(rawData.get("projectID"))
+    updateJsonString = rawData.get("tileData")
+    
+    entryType = "deleteTile"
+    returnMessage = DivcoDataStore.addToProjectHistory(projectID, entryType, updateJsonString)
+
+    response = {}
+    response["result"] = returnMessage["status"]
+
+    return jsonResponse(response, authToken)
 
 @app.route('/papi/hack')
 def hackspace():
-    # initDivco()
-    # nextPID = incProjectCounter()
-
-
-    pID = 3
+    ## DO ONCE FOR SERVER SETUP
+    # DivcoDataStore.initDivco()
+    # pID = DivcoDataStore.incProjectCounter()
 
     doReset = True
     if doReset: ## TEST FLOW
-        DivcoDataStore.clearProject(pID)
+        # DivcoDataStore.clearProject(pID)
 
-        DivcoDataStore.createProjectMeta(pID)
+        # DivcoDataStore.createProjectMeta(pID)
 
         entryType = "createTile"
         rawEntryArgs = r'{"label":"tile_1","parentID":null}'
@@ -172,16 +156,27 @@ def hackspace():
         rawEntryArgs = r'{"tileID":5,"order":1}'
         DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-
-
-    
     response = {}
     
-    
-    # userProjectList = getAllUserProject("C")
-
     return jsonResponse(response)
 
+@app.route('/papi/test')
+def testEndpoint():
+    DivcoDataStore.test()
+
+    response = {}
+    
+    return jsonResponse(response)
+
+
+@app.errorhandler(401)
+@app.errorhandler(403)
+@app.errorhandler(404)
+def page_not_found(error):
+    return jsonResponse({
+        "errorCode" : error.code,
+        "errorMsg" : error.description
+    }), error.code
 
 if __name__ == '__main__':
     # This is used when running locally only. When deploying to Google App
@@ -191,4 +186,4 @@ if __name__ == '__main__':
     # the "static" directory. See:
     # http://flask.pocoo.org/docs/1.0/quickstart/#static-files. Once deployed,
     # App Engine itself will serve those files as configured in app.yaml.
-    app.run(host='127.0.0.1', port=8080, debug=True)
+    app.run(host='localhost', port=51245, debug=True)

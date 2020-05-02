@@ -11,6 +11,12 @@ indexes:
   - name: parentID
   - name: order
 
+- kind: projectTileData
+  properties:
+  - name: parentPath
+  - name: projectID
+  - name: stepCounter
+
 # - kind: LogEvent
 #   properties:
 #   - name: projectID

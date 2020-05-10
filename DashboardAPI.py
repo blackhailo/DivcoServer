@@ -13,12 +13,8 @@ from Toolbox import jsonResponse
 
 DSC = datastore.Client()
 
-# def getProjectMetaTF(projectMetaItem):
-#     dataItem = {}
 
     
-
-#     return dataItem
 
 class DashboardAPI:
     def __init__(self, app):

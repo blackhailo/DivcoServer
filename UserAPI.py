@@ -19,6 +19,7 @@ class UserAPI:
     def __init__(self, app):
         app.add_url_rule('/papi/getUserData', 'getUserData', self.getUserData)
 
+        app.add_url_rule('/papi/doSignup', 'doSignup', self.doSignup, methods=['POST'])
         app.add_url_rule('/papi/doLogin', 'doLogin', self.doLogin, methods=['POST'])
         app.add_url_rule('/papi/doLogout', 'doLogout', self.doLogout)
 
@@ -37,6 +38,19 @@ class UserAPI:
 
         return jsonResponse(activeUser, authToken)
     
+    def doSignup(self):
+        rawData = flask.request.form
+
+        name = rawData.get("name")
+        email = rawData.get("email").lower()
+        password = rawData.get("password")
+
+        DivcoDataStore.createNewUser(name, email, password)
+
+        activeUser = {"msg" : "user created"}
+
+        return jsonResponse(activeUser)
+
     def doLogin(self):
         rawData = flask.request.form
 
@@ -64,5 +78,5 @@ class UserAPI:
     def doLogout(self):
         activeAuthToken = AuthModule.validateCookie(True)
         DivcoDataStore.clearLoginSession(activeAuthToken)
-        
+
         return jsonResponse({"msg": "user logged out."}, authToken="")

@@ -3,6 +3,9 @@ import codecs
 import json
 import datetime
 
+import io
+import csv
+
 import flask
 import werkzeug.exceptions
 
@@ -15,7 +18,7 @@ import UserAPI
 
 import AuthModule
 
-from Toolbox import jsonResponse
+from Toolbox import jsonResponse, csvResponse
 
 app = flask.Flask(__name__)
 
@@ -60,6 +63,21 @@ def getData():
     return jsonResponse(response, authToken)
 
 
+@app.route('/papi/reorderTile', methods=['POST'])
+def reorderTile():
+    authToken = AuthModule.validateCookie()
+    rawData = flask.request.form
+
+    projectID = int(rawData.get("projectID"))
+    updateJsonString = rawData.get("tileData")
+    
+    entryType = "reorderTile"
+    returnMessage = DivcoDataStore.addToProjectHistory(projectID, entryType, updateJsonString)
+
+    response = {}
+    response["result"] = returnMessage
+
+    return jsonResponse(response, authToken)
 
 @app.route('/papi/updateTile', methods=['POST'])
 def updateTile():
@@ -112,49 +130,113 @@ def deleteTile():
 
     return jsonResponse(response, authToken)
 
+@app.route('/papi/getProjectUserList/<int:pID>')
+def getProjectUserList(pID):
+    authToken = AuthModule.validateCookie()
+
+    userList = DivcoDataStore.getProjectUserList(pID)
+    
+    response = {}
+    response["data"] = userList
+
+    return jsonResponse(response, authToken)
+
+@app.route('/papi/addUserToProject/<int:pID>', methods=['POST'])
+def addUserToProject(pID):
+    authToken = AuthModule.validateCookie()
+    rawData = flask.request.form
+    
+    email = rawData.get("email")
+    rights = rawData.get("rights")
+    
+    result = DivcoDataStore.addUserToProject(pID, email, rights)
+    
+    response = {}
+    response["result"] = result
+
+    return jsonResponse(response, authToken)
+
+@app.route('/papi/export/<int:pID>')
+def exportProject(pID):
+    authToken = AuthModule.validateCookie()
+
+    projectHistoryList = DivcoDataStore.getCompleteProjectHistory(pID)
+    
+    output = io.StringIO()
+
+    writer = csv.writer(output, quoting=csv.QUOTE_NONNUMERIC)
+    writer.writerows(projectHistoryList)
+
+    data = output.getvalue()
+
+    return csvResponse("test.csv", data, authToken)
+
+@app.route('/papi/import/<int:pID>', methods=['POST'])
+def importProject(pID):
+    authToken = AuthModule.validateCookie()
+
+    rawData = flask.request.form
+    projectHistory = rawData.get("projectHistory")
+
+    reader = csv.reader(io.StringIO(projectHistory))
+    next(reader)
+    for row in reader:
+        entryType = row[1]
+        entryArgs = row[2]
+
+        DivcoDataStore.addToProjectHistory(pID, entryType, entryArgs)
+
+    response = {}
+    response["debug"] = projectHistory
+    
+    return jsonResponse(response)
+
 @app.route('/papi/hack')
 def hackspace():
     ## DO ONCE FOR SERVER SETUP
     # DivcoDataStore.initDivco()
-    # pID = DivcoDataStore.incProjectCounter()
+    
+    
+    # CREATE NEW PROJECT
+    
 
-    doReset = True
-    if doReset: ## TEST FLOW
-        # DivcoDataStore.clearProject(pID)
+    # CLEAR AND RESET PROJECT
+    DivcoDataStore.initDivco()
 
-        # DivcoDataStore.createProjectMeta(pID)
 
-        entryType = "createTile"
-        rawEntryArgs = r'{"label":"tile_1","parentID":null}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    # doReset = True
+    # if doReset: ## TEST FLOW
+    #     entryType = "createTile"
+    #     rawEntryArgs = r'{"label":"tile_1","parentID":null}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "createTile"
-        rawEntryArgs = r'{"label":"tile_2","parentID":1}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "createTile"
+    #     rawEntryArgs = r'{"label":"tile_2","parentID":1}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "updateTile"
-        rawEntryArgs = r'{"tileID":1,"label":"TILE_1","status":3}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "updateTile"
+    #     rawEntryArgs = r'{"tileID":1,"label":"TILE_1","status":3}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "deleteTile"
-        rawEntryArgs = r'{"tileID":2}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "deleteTile"
+    #     rawEntryArgs = r'{"tileID":2}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "createTile"
-        rawEntryArgs = r'{"label":"tile_3","parentID":1}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "createTile"
+    #     rawEntryArgs = r'{"label":"tile_3","parentID":1}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "createTile"
-        rawEntryArgs = r'{"label":"tile_4","parentID":1}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "createTile"
+    #     rawEntryArgs = r'{"label":"tile_4","parentID":1}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "createTile"
-        rawEntryArgs = r'{"label":"tile_5","parentID":1}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "createTile"
+    #     rawEntryArgs = r'{"label":"tile_5","parentID":1}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
-        entryType = "reorderTile"
-        rawEntryArgs = r'{"tileID":5,"order":1}'
-        DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
+    #     entryType = "reorderTile"
+    #     rawEntryArgs = r'{"tileID":5,"order":1}'
+    #     DivcoDataStore.addToProjectHistory(pID, entryType, rawEntryArgs)
 
     response = {}
     
@@ -162,7 +244,11 @@ def hackspace():
 
 @app.route('/papi/test')
 def testEndpoint():
-    DivcoDataStore.test()
+    email = "test@wathever.com"
+    name = "HailoTest"
+    password = "ged"
+
+    DivcoDataStore.createNewUser(name, email, password)
 
     response = {}
     

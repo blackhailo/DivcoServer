@@ -8,8 +8,19 @@ indexes:
 
 - kind: projectTileData
   properties:
+  - name: projectID
+  - name: order
+
+- kind: projectTileData
+  properties:
   - name: parentID
   - name: order
+
+- kind: projectTileData
+  properties:
+  - name: projectID
+  - name: order
+    direction: desc
 
 - kind: projectTileData
   properties:
@@ -17,24 +28,16 @@ indexes:
   - name: projectID
   - name: stepCounter
 
-# - kind: LogEvent
-#   properties:
-#   - name: projectID
-#   - name: timeStamp
 
-# - kind: LogEvent
-#   properties:
-#   - name: projectID
-#   - name: timeStamp
-#     direction: desc
 
-# - kind: TPStore_v2
-#   properties:
-#   - name: PID
-#   - name: NID
 
-# - kind: TPStore_v2
-#   properties:
-#   - name: PID
-#   - name: NID
-#     direction: desc
+- kind: projectHistory
+  properties:
+  - name: projectID
+  - name: ts
+    direction: desc
+
+- kind: projectHistory
+  properties:
+  - name: projectID
+  - name: ts

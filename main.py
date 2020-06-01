@@ -46,7 +46,8 @@ def getData():
     projectID = int(flask.request.args.get('projectID', ''))
     tileID = int(flask.request.args.get('tileID', ''))
 
-    divcoTileData = DivcoDataStore.getTileDataTree(projectID, tileID, 100)
+    currentRoot = DivcoDataStore.getTileDataNode(projectID, tileID)
+    divcoTileData = DivcoDataStore.getTileDataTree(projectID, tileID, currentRoot["stepCounter"] + 4)
 
     currentNode = DivcoDataStore.getTileDataNode(projectID, tileID)
     parentPath = currentNode["parentPath"]
@@ -156,6 +157,140 @@ def addUserToProject(pID):
 
     return jsonResponse(response, authToken)
 
+@app.route('/papi/exportLegacyProject/<int:pID>')
+def exportLegacyProject(pID):
+    authToken = AuthModule.validateCookie()
+
+    projectHistoryList = DivcoDataStore.getLegacyProjectHistory(pID)
+    
+    output = io.StringIO()
+
+    writer = csv.writer(output, quoting=csv.QUOTE_NONNUMERIC)
+    writer.writerows(projectHistoryList)
+
+    data = output.getvalue()
+
+    return csvResponse("p" + str(pID) + ".csv", data, authToken)
+
+
+@app.route('/papi/importLegacy/<int:pID>', methods=['POST'])
+def importLegacy(pID):
+    authToken = AuthModule.validateCookie()
+
+    DivcoDataStore.clearProject(pID)
+    activeUserData = DivcoDataStore.getUserByLoginSession(authToken)
+    DivcoDataStore.createNewProject(activeUserData.key.id, "Stub", pID)
+    
+    rawData = flask.request.form
+    projectHistory = rawData.get("projectHistory")
+    # projectMeta
+    # createProjectMeta
+    highestTileID = 0
+    reader = csv.reader(io.StringIO(projectHistory))
+    next(reader) #skip Header
+    for row in reader:
+        entryDate = row[0]
+        entryType = row[1]
+        entryArgs = row[2]
+
+        if entryType == "reorderTiles":
+            newEntryArgs = {}
+
+            updateTileSet = []
+            entryJson = json.loads(entryArgs)
+            for key, value in entryJson.items():
+                tileID = int(key)
+                order = value
+                updateTileSet.append([tileID, order])
+
+            newEntryArgs["updateTileSet"] = updateTileSet
+            DivcoDataStore.addToProjectHistory(pID, "reorderTile", json.dumps(newEntryArgs))
+            print(pID, entryDate, "reorderTile", json.dumps(newEntryArgs))
+        elif entryType == "setStatus":
+            newEntryArgs = {}
+            entryJson = json.loads(entryArgs)
+            status = entryJson.get("status")
+            if status == 2:
+                status = 3
+            elif status == 3:
+                status = 2
+
+            # for tileID in 
+            newEntryArgs["tileIDList"] = entryJson.get("nodeIDList")
+            newEntryArgs["status"] = status
+
+            DivcoDataStore.addToProjectHistory(pID, "updateTile", json.dumps(newEntryArgs))
+            print(pID, entryDate, "updateTile", json.dumps(newEntryArgs))
+        elif entryType == "insertTile":
+            newEntryArgs = {}
+            entryJson = json.loads(entryArgs)
+            # "{""status"":0,""ordering"":4,""forcedStatus"":false,""label"":""134"",""parent_path"":[1,4],""id"":4}"
+            # "{""label"": ""abc"", ""parentID"": 1, ""tileID"": 4}"
+
+            tileID = entryJson.get("id")
+            newEntryArgs["tileID"] = tileID
+            newEntryArgs["label"] = entryJson.get("label")
+
+            parentPath = entryJson.get("parent_path")
+            if len(parentPath) > 1:
+                newEntryArgs["parentID"] = parentPath[-2]
+
+            highestTileID = max(highestTileID, tileID)
+            DivcoDataStore.addToProjectHistory(pID, "createTile", json.dumps(newEntryArgs))
+            print(pID, entryDate, "createTile", json.dumps(newEntryArgs))
+        elif entryType == "removeTile":
+            newEntryArgs = {}
+            entryJson = json.loads(entryArgs)
+            # "removeTile","{""removedTileIDList"":[3,2]}"
+            # "deleteTile","{""tileID"": 4}"
+
+            newEntryArgs["tileIDList"] = list(set(entryJson.get("removedTileIDList")))
+            DivcoDataStore.addToProjectHistory(pID, "deleteTile", json.dumps(newEntryArgs))
+            print(pID, entryDate, "deleteTile", json.dumps(newEntryArgs))
+        elif entryType == "modify":
+            entryJson = json.loads(entryArgs)
+
+            nodeIDList = entryJson.get("nodeIDList")
+            nodeLabel = entryJson.get("label")
+            parentPath = entryJson.get("parentPath")
+            if parentPath != None:
+                newParentID = parentPath[-2]
+            else:
+                newParentID = None
+                
+            # "modify","{""nodeIDList"":[4],""label"":""Kompetance s\u00e6tninger""}"
+            # "updateTile","{""tileID"": 3, ""label"": ""Kompetance s\u00e6tninger nogeet""}"
+            # 1565335615,"modify","{""nodeIDList"":[15],""parentPath"":[1,17,2,15]}"
+
+            for tileID in nodeIDList:
+                newEntryArgs = {}
+                newEntryArgs["tileIDList"] = [tileID]
+
+                if nodeLabel != None:
+                    newEntryArgs["label"] = nodeLabel
+                if newParentID != None:
+                    newEntryArgs["parentID"] = newParentID
+                
+                DivcoDataStore.addToProjectHistory(pID, "updateTile", json.dumps(newEntryArgs))
+                print(pID, entryDate, "updateTile", json.dumps(newEntryArgs))
+                
+        else:
+            print("not implemented", entryType)
+    
+    # set TILE COUNT
+    with DSC.transaction():
+        projectMetaItem = DSC.get(DSC.key('projectMeta', pID))
+        projectMetaItem.update({
+            'tileCounter': highestTileID + 1
+        })
+
+        DSC.put(projectMetaItem)
+
+    response = {}
+    response["debug"] = projectHistory
+    
+    return jsonResponse(response)
+
 @app.route('/papi/export/<int:pID>')
 def exportProject(pID):
     authToken = AuthModule.validateCookie()
@@ -169,22 +304,42 @@ def exportProject(pID):
 
     data = output.getvalue()
 
-    return csvResponse("test.csv", data, authToken)
+    return csvResponse("p" + str(pID) + ".csv", data, authToken)
 
 @app.route('/papi/import/<int:pID>', methods=['POST'])
 def importProject(pID):
     authToken = AuthModule.validateCookie()
 
+    DivcoDataStore.clearProject(pID)
+    activeUserData = DivcoDataStore.getUserByLoginSession(authToken)
+    DivcoDataStore.createNewProject(activeUserData.key.id, "Stub", pID)
+
     rawData = flask.request.form
     projectHistory = rawData.get("projectHistory")
 
+    maxUsedTileID = 0
+
     reader = csv.reader(io.StringIO(projectHistory))
     next(reader)
-    for row in reader:
+    for i, row in enumerate(reader):
         entryType = row[1]
         entryArgs = row[2]
 
+        entryTileID = json.loads(entryArgs).get("tileID")
+        if entryTileID:
+            maxUsedTileID = max(entryTileID, maxUsedTileID)
+        if i % 20 == 0:
+            print(i, entryType, entryArgs)
+
         DivcoDataStore.addToProjectHistory(pID, entryType, entryArgs)
+
+    with DSC.transaction():
+        projectMetaItem = DSC.get(DSC.key('projectMeta', pID))
+        projectMetaItem.update({
+            'tileCounter': maxUsedTileID
+        })
+
+        DSC.put(projectMetaItem)
 
     response = {}
     response["debug"] = projectHistory
@@ -193,6 +348,7 @@ def importProject(pID):
 
 @app.route('/papi/hack')
 def hackspace():
+    pass
     ## DO ONCE FOR SERVER SETUP
     # DivcoDataStore.initDivco()
     
@@ -201,7 +357,7 @@ def hackspace():
     
 
     # CLEAR AND RESET PROJECT
-    DivcoDataStore.initDivco()
+    # DivcoDataStore.initDivco()
 
 
     # doReset = True
@@ -242,18 +398,17 @@ def hackspace():
     
     return jsonResponse(response)
 
-@app.route('/papi/test')
-def testEndpoint():
-    email = "test@wathever.com"
-    name = "HailoTest"
-    password = "ged"
+# @app.route('/papi/test')
+# def testEndpoint():
+#     email = "test@wathever.com"
+#     name = "HailoTest"
+#     password = "ged"
 
-    DivcoDataStore.createNewUser(name, email, password)
+#     DivcoDataStore.createNewUser(name, email, password)
 
-    response = {}
+#     response = {}
     
-    return jsonResponse(response)
-
+#     return jsonResponse(response)
 
 @app.errorhandler(401)
 @app.errorhandler(403)

@@ -1,15 +1,8 @@
 import flask
 import json
 import datetime
-import random
 
 import DataStore.DivcoDataStore as DivcoDataStore
-
-def createSalt():
-    ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    salt = ''.join(random.choice(ALPHABET) for i in range(16))
-
-    return salt
 
 def csvResponse(filename, csvData, authToken=None):
     response = flask.Response(csvData, content_type="text/csv; charset=utf-8")
@@ -46,7 +39,7 @@ def jsonResponse(responseDict, authToken=None):
     if authToken == "":
         response.set_cookie("DIVCO_AUTH_TOKEN", "", expires=0, samesite="Strict")
     elif authToken:
-        expiration = datetime.datetime.now() + datetime.timedelta(hours=2)
+        expiration = datetime.datetime.now() + datetime.timedelta(days=2)
 
         DivcoDataStore.refreshLoginSession(authToken, expiration)
         response.set_cookie("DIVCO_AUTH_TOKEN", authToken, expires=expiration.timestamp(), samesite="Strict")

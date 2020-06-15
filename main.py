@@ -150,12 +150,31 @@ def addUserToProject(pID):
     email = rawData.get("email")
     rights = rawData.get("rights")
     
-    result = DivcoDataStore.addUserToProject(pID, email, rights)
+    response = {}
+    try:
+        result = DivcoDataStore.addUserToProject(pID, email, rights)
+        response["result"] = result
+    except ValueError as err:
+        response["errorMsg"] = str(err)
+    
+    return jsonResponse(response, authToken)
+
+@app.route('/papi/removeUserFromProject/<int:pID>', methods=['POST'])
+def removeUserFromProject(pID):
+    authToken = AuthModule.validateCookie()
+    rawData = flask.request.form
+    
+    email = rawData.get("email")
     
     response = {}
-    response["result"] = result
-
+    try:
+        result = DivcoDataStore.removeUserFromProject(pID, email)
+        response["result"] = result
+    except ValueError as err:
+        response["errorMsg"] = str(err)
+    
     return jsonResponse(response, authToken)
+
 
 @app.route('/papi/exportLegacyProject/<int:pID>')
 def exportLegacyProject(pID):

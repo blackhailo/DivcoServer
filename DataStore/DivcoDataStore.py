@@ -186,54 +186,49 @@ def addToDivCoData(pID, entryType, entryArgs):
                 updateDict = {}
                 newParentID = entryArgs.get("parentID")
                 if newParentID != None:
+                    oldParentID = tileData["parentID"]
                     parentTile = getTileDataNode(pID, newParentID)
 
-                    updatedParentPath = copy.deepcopy(parentTile["parentPath"])
-                    updatedParentPath.append(tileID)
-                    
-                    curStepCounter = tileData["stepCounter"]
-                    itemList = getChildrenOfTile(pID, tileID, curStepCounter)
-                    updateDict["parentID"] = newParentID
-                    updateDict["parentPath"] = updatedParentPath
-                    updateDict["stepCounter"] = len(updatedParentPath)
+                    pathSection = [oldParentID, tileID]
+                    matchingParentPathList = getMatchingParentPathList(pID, pathSection)
 
-                    for childItem in itemList:
-                        parentPath = childItem["parentPath"]
-                        parentPath[curStepCounter:]
+                    for item in matchingParentPathList:
+                        currentPPath = item["parentPath"]
+                        newSuperPath = parentTile["parentPath"]
+                        indexOfOldParent = currentPPath.index(oldParentID)
 
-                        updatedChildParentPath = copy.deepcopy(updatedParentPath)
-                        updatedChildParentPath.extend(parentPath[curStepCounter:])
+                        updatedPath = copy.deepcopy(newSuperPath)
+                        updatedPath.extend(currentPPath[indexOfOldParent + 1:])
+                        
+                        item.update({
+                            "parentID" : updatedPath[-2],
+                            "parentPath" : updatedPath,
+                            "stepCounter" : len(updatedPath)
+                        })                   
 
-                        childItem.update({
-                            "parentPath" : updatedChildParentPath,
-                            "stepCounter" : len(updatedChildParentPath)
-                        })
+                        updateGroup.append(item)
+                else:
+                    newLabel = entryArgs.get("label")
+                    if newLabel != None:
+                        if tileID == 1:
+                            changeProjectMetaName(pID, newLabel)
+                        
+                        updateDict["label"] = newLabel
 
-                        updateGroup.append(childItem)
+                    newStatus = entryArgs.get("status")
+                    if newStatus != None:
+                        updateDict["status"] = newStatus
 
-                    ## TODO UPDATE PARENT_PATH of cut tile and children
+                    newAutoStatus = entryArgs.get("autoStatus")
+                    if newAutoStatus != None:
+                        updateDict["autoStatus"] = newAutoStatus
 
-                newLabel = entryArgs.get("label")
-                if newLabel != None:
-                    if tileID == 1:
-                        changeProjectMetaName(pID, newLabel)
-                    
-                    updateDict["label"] = newLabel
+                    newOrder = entryArgs.get("order")
+                    if newOrder != None:
+                        updateDict["order"] = newOrder
 
-                newStatus = entryArgs.get("status")
-                if newStatus != None:
-                    updateDict["status"] = newStatus
-
-                newAutoStatus = entryArgs.get("autoStatus")
-                if newAutoStatus != None:
-                    updateDict["autoStatus"] = newAutoStatus
-
-                newOrder = entryArgs.get("order")
-                if newOrder != None:
-                    updateDict["order"] = newOrder
-
-                tileData.update(updateDict)
-                updateGroup.append(tileData)
+                    tileData.update(updateDict)
+                    updateGroup.append(tileData)
 
         if len(updateGroup) > 0:
             DSC.put_multi(updateGroup)
@@ -480,6 +475,7 @@ def getProjectUserList(pID):
             userDataItem = DSC.get(DSC.key('user', userID))
 
             userResponseItem = {}
+            userResponseItem["name"] = userDataItem["name"]
             userResponseItem["email"] = userDataItem["email"]
             userResponseItem["rights"] = "owner"
 
@@ -489,6 +485,7 @@ def getProjectUserList(pID):
             userDataItem = DSC.get(DSC.key('user', userID))
 
             userResponseItem = {}
+            userResponseItem["name"] = userDataItem["name"]
             userResponseItem["email"] = userDataItem["email"]
             userResponseItem["rights"] = "user"
 
@@ -500,15 +497,42 @@ def addUserToProject(pID, email, rights):
     projectMeta = DSC.get(DSC.key('projectMeta', pID))
 
     user = getUserByEmail(email)
-    if rights == "owner":
-        ownerIDList = projectMeta["ownerUserList"]
-        ownerIDList.append(user.key.id)
-        projectMeta.update({"ownerUserList" : ownerIDList})
-    elif rights == "user":
-        userIDList = projectMeta["assoUserList"]
-        userIDList.append(user.key.id)
-        projectMeta.update({"assoUserList" : userIDList})
+
+    if user:
+        if rights == "owner":
+            ownerIDList = projectMeta["ownerUserList"]
+            ownerIDList.append(user.key.id)
+            projectMeta.update({"ownerUserList" : ownerIDList})
+        elif rights == "user":
+            userIDList = projectMeta["assoUserList"]
+            userIDList.append(user.key.id)
+            projectMeta.update({"assoUserList" : userIDList})
     
+        DSC.put(projectMeta)
+    else:
+        raise ValueError("User does not exist")
+
+def removeUserFromProject(pID, email):
+    projectMeta = DSC.get(DSC.key('projectMeta', pID))
+
+    user = getUserByEmail(email)
+
+    ownerIDList = projectMeta["ownerUserList"]
+    for ownerID in ownerIDList:
+        if ownerID != user.key.id:
+            continue
+        elif ownerID == user.key.id and len(ownerIDList) > 1:
+            ownerIDList.remove(ownerID)
+            projectMeta.update({"ownerUserList" : ownerIDList})
+        else:
+            raise ValueError("cannot delete the last owner of the project")
+
+    userIDList = projectMeta["assoUserList"]
+    for userID in userIDList:
+        if userID == user.key.id:
+            userIDList.remove(userID)
+            projectMeta.update({"assoUserList" : userIDList})
+
     DSC.put(projectMeta)
 
 def getCompleteProjectHistory(pID):
@@ -555,3 +579,14 @@ def getLegacyProjectHistory(pID):
     print(nextCursor)
 
     return csvRowList
+
+def getMatchingParentPathList(pID, pathSection):
+    queryTileData = DSC.query(kind='projectTileData')
+    queryTileData.add_filter('projectID', '=', pID)
+
+    for tileID in pathSection:
+        queryTileData.add_filter('parentPath', '=', tileID)
+
+    queryResult = queryTileData.fetch()
+    
+    return queryResult

@@ -13,9 +13,6 @@ from Toolbox import jsonResponse
 
 DSC = datastore.Client()
 
-
-    
-
 class DashboardAPI:
     def __init__(self, app):
         app.add_url_rule('/papi/getProjectList', 'getProjectList', self.getProjectList)

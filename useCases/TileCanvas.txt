@@ -1,18 +1,29 @@
+I) rework eventHandling
+    Adding in DPI correction for mouse events (DONE)
+
+II) display tiles
+    box drawn (DONE)
+    header text added (DONE)
+    draw nested children
+
+    add text size limits
+
+
 1) move tile:
-    mouseDown + mouseMove change cursor to move
-    mouseUp if changed cursor change to default cursor
+    mouseDown + mouseMove change cursor to move (DONE)
+    mouseUp if changed cursor change to default cursor (DONE)
 
-    find cursorTile (do pick)
+    find cursorTile (do pick) (DONE)
 
-    src tile
-    target tile
+    src tile (DONE)
+    target tile (DONE)
 
-    get order of targetTile change srcTile order to targetTile + 1 
+    get order of targetTile change srcTile order to targetTile + 1 (DONE)
+    
+    refresh (DONE)
     
     performance?
         call order normalize order
-
-    refresh
 
 2) rename tile:
     right click -> select tile

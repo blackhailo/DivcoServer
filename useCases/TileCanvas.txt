@@ -1,0 +1,46 @@
+1) move tile:
+    mouseDown + mouseMove change cursor to move
+    mouseUp if changed cursor change to default cursor
+
+    find cursorTile (do pick)
+
+    src tile
+    target tile
+
+    get order of targetTile change srcTile order to targetTile + 1 
+    
+    performance?
+        call order normalize order
+
+    refresh
+
+2) rename tile:
+    right click -> select tile
+    choose rename option
+    open rename promt with
+    refresh
+
+3) delete tile:
+    right click -> select tile
+    choose delete option
+    open confirm promt
+    refresh
+
+4) copy - paste tile:
+    select tile
+    ctrl c
+    ctrl v
+    refresh
+
+5) cut - paste tile:
+    select tile
+    ctrl x
+    ctrl v
+    refresh
+
+6) pin tile:
+    right click -> select tile
+    choose pin
+    refresh
+
+

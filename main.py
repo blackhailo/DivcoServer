@@ -27,6 +27,7 @@ DashboardAPI.DashboardAPI(app)
 
 @app.route('/')
 @app.route('/dashboard')
+@app.route('/tf_v2/<int:pID>/<int:tID>')
 @app.route('/tf/<int:pID>/<int:tID>')
 def reactClientHandler(pID = None, tID = None):
     print(flask.request.path)

@@ -4,9 +4,13 @@ I) rework eventHandling
 II) display tiles
     box drawn (DONE)
     header text added (DONE)
-    draw nested children
+    draw nested children (DONE)
 
-    add text size limits
+    add text size limits (DONE)
+    min child size (DONE)
+    status colors (DONE)
+
+III) enable rightclick menu again (DONE)
 
 
 1) move tile:

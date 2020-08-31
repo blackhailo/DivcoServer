@@ -244,11 +244,11 @@ def addToDivCoData(pID, entryType, entryArgs):
 
         returnMessage["status"] = True
     elif entryType == "reorderTile":
-        updateTileSet = entryArgs.get("updateTileSet")
+        tileIDNewOrderList = entryArgs.get("tileIDNewOrderList")
 
         batch = DSC.batch()
         with batch:
-            for item in updateTileSet:
+            for item in tileIDNewOrderList:
                 tileID = item[0]
                 tileOrder = item[1]
 

@@ -13,7 +13,7 @@ II) display tiles
 III) enable rightclick menu again (DONE)
 
 
-1) move tile:
+1) move tile: (DONE)
     mouseDown + mouseMove change cursor to move (DONE)
     mouseUp if changed cursor change to default cursor (DONE)
 
@@ -25,37 +25,52 @@ III) enable rightclick menu again (DONE)
     get order of targetTile change srcTile order to targetTile + 1 (DONE)
     
     refresh (DONE)
-    
-    performance?
-        call order normalize order
 
-2) rename tile:
-    right click -> select tile
-    choose rename option
-    open rename promt with
-    refresh
+2) rename tile: (DONE)
+    right click -> select tile (DONE)
+    choose rename option (DONE)
+    open rename promt with (DONE)
+    refresh (DONE)
 
-3) delete tile:
-    right click -> select tile
-    choose delete option
-    open confirm promt
-    refresh
+3) delete tile: (DONE)
+    right click -> select tile (DONE)
+    choose delete option (DONE)
+    open confirm promt (DONE)
+    refresh (DONE)
 
-4) copy - paste tile:
-    select tile
-    ctrl c
-    ctrl v
-    refresh
+4) cut - paste tile: (DONE)
+    select tile (DONE)
+    ctrl x (DONE) 
+    ctrl v (DONE)
+    refresh (DONE)
 
-5) cut - paste tile:
-    select tile
-    ctrl x
-    ctrl v
-    refresh
+## To be implemented
+?) copy - paste tile: 
+    select tile 
+    ctrl c 
+    ctrl v 
+    refresh 
 
-6) pin tile:
+?) pin tile:
     right click -> select tile
     choose pin
     refresh
 
 
+
+
+
+## Think tank.
+
+?) Add a Generation to the project
+    go to project details
+    add Generation to project Generation
+    type in name 
+    press save
+
+?) Add tile to Generation:
+    select tile
+    choose edit option
+    open edit promt
+    select Generation
+    add

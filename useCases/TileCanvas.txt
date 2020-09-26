@@ -44,6 +44,14 @@ III) enable rightclick menu again (DONE)
     ctrl v (DONE)
     refresh (DONE)
 
+5) Add tile to layer:
+    select tile (DONE)
+    choose edit option (DONE)
+    open edit promt (DONE)
+    select layer (DONE)
+    add (DONE)
+
+
 ## To be implemented
 ?) copy - paste tile: 
     select tile 
@@ -56,21 +64,9 @@ III) enable rightclick menu again (DONE)
     choose pin
     refresh
 
-
-
-
-
 ## Think tank.
-
-?) Add a Generation to the project
+?) Add a layer to the project
     go to project details
-    add Generation to project Generation
+    add layer to project layering
     type in name 
     press save
-
-?) Add tile to Generation:
-    select tile
-    choose edit option
-    open edit promt
-    select Generation
-    add

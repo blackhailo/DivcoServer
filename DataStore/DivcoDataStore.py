@@ -167,7 +167,9 @@ def addToDivCoData(pID, entryType, entryArgs):
             "label": label,
             "status": status,
             "autoStatus": 0,
-            "order": order
+            "order": order,
+
+            "layerID" : 1
         })
 
         DSC.put(projectTileData)
@@ -226,6 +228,10 @@ def addToDivCoData(pID, entryType, entryArgs):
                     newOrder = entryArgs.get("order")
                     if newOrder != None:
                         updateDict["order"] = newOrder
+
+                    newLayerID = entryArgs.get("layerID")
+                    if newLayerID != None:
+                        updateDict["layerID"] = newLayerID
 
                     tileData.update(updateDict)
                     updateGroup.append(tileData)
@@ -313,6 +319,7 @@ def getTransFormat(tileDataItem):
     dataItem["label"] = tileDataItem["label"]
     dataItem["status"] = tileDataItem["status"]
     dataItem["order"] = tileDataItem["order"]
+    dataItem["layerID"] = tileDataItem["layerID"]
 
     return dataItem
 
